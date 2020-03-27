@@ -30,13 +30,13 @@ import (
 )
 
 // hmacSecret contains a hmac token and the time when it's created.
-type hmacSecret struct {
+type HmacSecret struct {
 	Value     string    `json:"value"`
 	CreatedAt time.Time `json:"created_at"`
 }
 
-// hmacsForRepo contains all hmac tokens configured for a repo, org or globally.
-type hmacsForRepo []hmacSecret
+// HmacsForRepo contains all hmac tokens configured for a repo, org or globally.
+type HmacsForRepo []HmacSecret
 
 // ValidatePayload ensures that the request payload signature matches the key.
 func ValidatePayload(payload []byte, sig string, tokenGenerator func() []byte) bool {
@@ -88,12 +88,12 @@ func PayloadSignature(payload []byte, key []byte) string {
 // we will try to match with org level.
 func extractHmacs(repo string, tokenGenerator func() []byte) ([][]byte, error) {
 	t := tokenGenerator()
-	repoToTokenMap := map[string]hmacsForRepo{}
+	repoToTokenMap := map[string]HmacsForRepo{}
 
 	if err := yaml.Unmarshal(t, &repoToTokenMap); err != nil {
 		// To keep backward compatibility, we are going to assume that in case of error,
 		// whole file is a single line hmac token.
-		//TODO : Once this code has been released and file has been moved to new format,
+		// TODO: Once this code has been released and file has been moved to new format,
 		// we should delete this code and return error.
 		logrus.WithError(err).Trace("Couldn't unmarshal the hmac secret as hierarchical file. Parsing as single token format")
 		return [][]byte{t}, nil
@@ -114,7 +114,7 @@ func extractHmacs(repo string, tokenGenerator func() []byte) ([][]byte, error) {
 }
 
 // extractTokens return tokens for any given level of tree.
-func extractTokens(allTokens hmacsForRepo) [][]byte {
+func extractTokens(allTokens HmacsForRepo) [][]byte {
 	validTokens := make([][]byte, len(allTokens))
 	for i := range allTokens {
 		validTokens[i] = []byte(allTokens[i].Value)

@@ -179,17 +179,19 @@ to start receiving GitHub events!
 Configure github to send your prow instance `application/json` webhooks
 for specific repos and/or whole orgs.
 
-You can do this with the `add-hook` utility:
+You can do this with the `update-hook` utility:
 
 ```sh
 # Note /path/to/hook/secret and /path/to/oauth/secret from earlier secrets step
 # Note the an.ip.addr.ess from previous ingres step
 
 # Ideally use https://bazel.build, alternatively try:
-#   go get -u k8s.io/test-infra/experiment/add-hook && add-hook
-bazel run //experiment/add-hook -- \
+#   go get -u k8s.io/test-infra/experiment/update-hook && update-hook
+bazel run //experiment/update-hook -- \
   --hmac-path=/path/to/hook/secret \
   --github-token-path=/path/to/oauth/secret \
+  --github-endpoint=http://ghproxy \  # Replace this as needed to point to your ghProxy instance.
+  --github-endpoint=https://api.github.com \
   --hook-url http://an.ip.addr.ess/hook \
   --repo my-org/my-repo \
   --repo my-whole-org \
@@ -202,7 +204,7 @@ Look for the `http://an.ip.addr.ess/hook` you added above.
 A green check mark (for a ping event, if you click edit and view the details of the event) suggests everything is working!
 
 You can click `Add webhook` on the Webhooks page to add the hook manually
-if you do not want to use the `add-hook` utility.
+if you do not want to use the `update-hook` utility.
 
 ## Next Steps
 

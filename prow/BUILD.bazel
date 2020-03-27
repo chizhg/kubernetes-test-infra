@@ -85,6 +85,7 @@ filegroup(
         "//prow/cmd/gcsupload:all-srcs",
         "//prow/cmd/gerrit:all-srcs",
         "//prow/cmd/grandmatriarch:all-srcs",
+        "//prow/cmd/hmac:all-srcs",
         "//prow/cmd/hook:all-srcs",
         "//prow/cmd/horologium:all-srcs",
         "//prow/cmd/initupload:all-srcs",

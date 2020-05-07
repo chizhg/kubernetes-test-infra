@@ -32,6 +32,7 @@ import (
 	"sigs.k8s.io/yaml"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+
 	v1 "k8s.io/test-infra/prow/apis/prowjobs/v1"
 	"k8s.io/test-infra/prow/config"
 	"k8s.io/test-infra/prow/config/secret"
@@ -94,6 +95,7 @@ const (
 	jobNameLengthWarning         = "long-job-names"
 	jobRefsDuplicationWarning    = "duplicate-job-refs"
 	needsOkToTestWarning         = "needs-ok-to-test"
+	managedWebhooksWarning       = "managed-webhooks"
 	validateOwnersWarning        = "validate-owners"
 	missingTriggerWarning        = "missing-trigger"
 	validateURLsWarning          = "validate-urls"
@@ -110,6 +112,7 @@ var defaultWarnings = []string{
 	jobNameLengthWarning,
 	jobRefsDuplicationWarning,
 	needsOkToTestWarning,
+	managedWebhooksWarning,
 	validateOwnersWarning,
 	missingTriggerWarning,
 	validateURLsWarning,
@@ -182,7 +185,7 @@ func (o *options) gatherOptions(flag *flag.FlagSet, args []string) error {
 		return fmt.Errorf("parse flags: %v", err)
 	}
 	if err := o.DefaultAndValidate(); err != nil {
-		return fmt.Errorf("Invalid options: %v", err)
+		return fmt.Errorf("invalid options: %v", err)
 	}
 	return nil
 }
@@ -294,6 +297,11 @@ func validate(o options) error {
 	}
 	if o.warningEnabled(needsOkToTestWarning) {
 		if err := validateNeedsOkToTestLabel(cfg); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	if o.warningEnabled(managedWebhooksWarning) {
+		if err := validateManagedWebhooks(cfg); err != nil {
 			errs = append(errs, err)
 		}
 	}
@@ -827,6 +835,28 @@ func validateNeedsOkToTestLabel(cfg *config.Config) error {
 		}
 	}
 	return utilerrors.NewAggregate(queryErrors)
+}
+
+func validateManagedWebhooks(cfg *config.Config) error {
+	var errs []error
+	orgs := sets.String{}
+	for repo := range cfg.ManagedWebhooks {
+		if !strings.Contains(repo,"/") {
+			org := repo
+			orgs.Insert(org)
+		}
+	}
+	for repo := range cfg.ManagedWebhooks {
+		if strings.Contains(repo, "/") {
+			org := strings.SplitN(repo, "/", 2)[0]
+			if orgs.Has(org) {
+				errs = append(errs, fmt.Errorf(
+					"org-level and repo-level webhooks are configured together for %q, " +
+						"which is not allowed as there will be duplicated webhook events", repo))
+			}
+		}
+	}
+	return utilerrors.NewAggregate(errs)
 }
 
 func pluginsWithOwnersFile() string {

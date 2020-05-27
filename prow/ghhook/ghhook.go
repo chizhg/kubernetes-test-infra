@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package updater
+package ghhook
 
 import (
 	"bytes"
@@ -24,6 +24,8 @@ import (
 	"io/ioutil"
 	"strings"
 
+	"github.com/sirupsen/logrus"
+
 	"k8s.io/test-infra/prow/config/secret"
 
 	"k8s.io/test-infra/prow/flagutil"
@@ -31,32 +33,44 @@ import (
 )
 
 type Options struct {
-	flagutil.GitHubOptions
+	GitHubOptions flagutil.GitHubOptions
+	client        github.Client
+
 	Repos        flagutil.Strings
 	HookURL      string
-	HmacValue    string
-	HmacPath     string
+	HMACValue    string
+	HMACPath     string
 	Events       flagutil.Strings
 	ShouldDelete bool
 	Confirm      bool
 }
 
+func (o *Options) Initialize() error {
+	var err error
+	o.client, err = o.githubClient()
+	if err != nil {
+		return fmt.Errorf("error creating github client: %v", err)
+	}
+	return nil
+}
+
 func GetOptions(fs *flag.FlagSet, args []string) (*Options, error) {
 	o := Options{}
-	o.AddFlags(fs)
+	o.GitHubOptions.AddFlags(fs)
 	o.Events = flagutil.NewStrings(github.AllHookEvents...)
 	fs.Var(&o.Events, "event", "Receive hooks for the following events, defaults to [\"*\"] (all events)")
 	fs.Var(&o.Repos, "repo", "Add hooks for this org or org/repos")
 	fs.StringVar(&o.HookURL, "hook-url", "", "URL to send hooks")
-	fs.StringVar(&o.HmacPath, "hmac-path", "", "Path to hmac secret")
-	fs.StringVar(&o.HmacValue, "hmac-value", "", "hmac secret value")
+	fs.StringVar(&o.HMACPath, "hmac-path", "", "Path to hmac secret")
+	fs.StringVar(&o.HMACValue, "hmac-value", "", "hmac secret value")
 	fs.BoolVar(&o.Confirm, "confirm", false, "Apply changes to github")
 	fs.BoolVar(&o.ShouldDelete, "delete-webhook", false, "Webhook should be deleted")
 	fs.Parse(args)
-	if o.HmacPath == "" && o.HmacValue == "" {
+
+	if !o.ShouldDelete && o.HMACPath == "" && o.HMACValue == "" {
 		return nil, errors.New("either '--hmac-path' or '--hmac-value' must be specified (only one of them)")
 	}
-	if o.HmacValue != "" && o.HmacPath != "" {
+	if !o.ShouldDelete && o.HMACValue != "" && o.HMACPath != "" {
 		return nil, errors.New("both '--hmac-path' and '--hmac-value' can not be set at the same time")
 	}
 	if o.HookURL == "" {
@@ -65,37 +79,41 @@ func GetOptions(fs *flag.FlagSet, args []string) (*Options, error) {
 	if len(o.Repos.Strings()) == 0 {
 		return nil, errors.New("no --repos set")
 	}
-	if err := o.Validate(!o.Confirm); err != nil {
+
+	o.GitHubOptions.AllowDirectAccess = true
+	var err error
+	if err = o.GitHubOptions.Validate(!o.Confirm); err != nil {
 		return nil, err
 	}
+
 	return &o, nil
 }
 
-func (o Options) githubClient() (github.Client, error) {
+func (o *Options) githubClient() (github.Client, error) {
 	agent := &secret.Agent{}
-	if err := agent.Start([]string{o.TokenPath}); err != nil {
-		return nil, fmt.Errorf("start %s: %v", o.TokenPath, err)
+	if err := agent.Start([]string{o.GitHubOptions.TokenPath}); err != nil {
+		return nil, fmt.Errorf("start %s: %v", o.GitHubOptions.TokenPath, err)
 	}
-	return o.GitHubClient(agent, !o.Confirm)
+	return o.GitHubOptions.GitHubClient(agent, !o.Confirm)
 }
 
-func (o Options) hmac() (string, error) {
-	b, err := ioutil.ReadFile(o.HmacPath)
+func (o *Options) hmacValueFromFile() (string, error) {
+	b, err := ioutil.ReadFile(o.HMACPath)
 	if err != nil {
-		return "", fmt.Errorf("read %s: %v", o.HmacPath, err)
+		return "", fmt.Errorf("read %s: %v", o.HMACPath, err)
 	}
 	return string(bytes.TrimSpace(b)), nil
 }
 
-func HandleWebhookConfigChange(o *Options) error {
-	hmac, err := getHmac(o)
-	if err != nil {
-		return fmt.Errorf("could not load hmac secret: %v", err)
-	}
-
-	client, err := o.githubClient()
-	if err != nil {
-		return fmt.Errorf("could not create github client: %v", err)
+func (o *Options) HandleWebhookConfigChange() error {
+	var hmac string
+	var err error
+	// hmac is only needed when we add or edit a webhook
+	if !o.ShouldDelete {
+		hmac, err = o.hmacValue()
+		if err != nil {
+			return fmt.Errorf("could not load hmac secret: %v", err)
+		}
 	}
 
 	yes := true
@@ -114,10 +132,10 @@ func HandleWebhookConfigChange(o *Options) error {
 		parts := strings.SplitN(orgRepo, "/", 2)
 		var ch changer
 		if len(parts) == 1 {
-			ch = orgChanger(client)
+			ch = orgChanger(o.client)
 		} else {
 			repo := parts[1]
-			ch = repoChanger(client, repo)
+			ch = repoChanger(o.client, repo)
 		}
 
 		org := parts[0]
@@ -136,7 +154,7 @@ func reconcileHook(ch changer, org string, req github.HookRequest, o *Options) e
 	id := findHook(hooks, req.Config.URL)
 	if id == nil {
 		if o.ShouldDelete {
-			// Its already been deleted. No op.
+			logrus.Infof("The webhook for %q does not exist, skip deletion", req.Config.URL)
 			return nil
 		}
 		_, err := ch.creator(org, req)
@@ -190,10 +208,10 @@ func repoChanger(client github.Client, repo string) changer {
 	}
 }
 
-func getHmac(o *Options) (string, error) {
-	if o.HmacValue != "" {
-		return o.HmacValue, nil
+func (o *Options) hmacValue() (string, error) {
+	if o.HMACValue != "" {
+		return o.HMACValue, nil
 	}
-	hmac, err := o.hmac()
+	hmac, err := o.hmacValueFromFile()
 	return hmac, err
 }

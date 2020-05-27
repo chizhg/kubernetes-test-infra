@@ -22,18 +22,21 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"k8s.io/test-infra/prow/cmd/hmac/updater"
+	"k8s.io/test-infra/prow/ghhook"
 )
 
 func main() {
 	set := flag.NewFlagSet(os.Args[0], flag.ExitOnError)
 
-	o, err := updater.GetOptions(set, os.Args[1:])
+	o, err := ghhook.GetOptions(set, os.Args[1:])
 	if err != nil {
 		logrus.WithError(err).Fatal("Error parsing the given args.")
 	}
+	if err := o.Initialize(); err != nil {
+		logrus.WithError(err).Fatal("Error initializing the updater.")
+	}
 
-	if err := updater.HandleWebhookConfigChange(o); err != nil {
+	if err := o.HandleWebhookConfigChange(); err != nil {
 		logrus.WithError(err).Fatal("Error handling the webhook config change.")
 	}
 }

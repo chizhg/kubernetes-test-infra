@@ -1024,22 +1024,15 @@ func (c *client) CreateRepoHook(org, repo string, req HookRequest) (int, error) 
 	return c.createHook(org, &repo, req)
 }
 
-func (c *client) deleteHook(org string, repo *string, id int, req HookRequest) error {
+func (c *client) deleteHook(path string) error {
 	if c.dry {
 		return nil
 	}
-	var path string
-	if repo != nil {
-		path = fmt.Sprintf("/repos/%s/%s/hooks/%d", org, *repo, id)
-	} else {
-		path = fmt.Sprintf("/orgs/%s/hooks/%d", org, id)
-	}
 
 	_, err := c.request(&request{
-		method:      http.MethodDelete,
-		path:        path,
-		exitCodes:   []int{204},
-		requestBody: &req,
+		method:    http.MethodDelete,
+		path:      path,
+		exitCodes: []int{204},
 	}, nil)
 	return err
 }
@@ -1048,14 +1041,16 @@ func (c *client) deleteHook(org string, repo *string, id int, req HookRequest) e
 // https://developer.github.com/v3/repos/hooks/#delete-a-hook
 func (c *client) DeleteRepoHook(org, repo string, id int, req HookRequest) error {
 	c.log("DeleteRepoHook", org, repo, id)
-	return c.deleteHook(org, &repo, id, req)
+	path := fmt.Sprintf("/repos/%s/%s/hooks/%d", org, repo, id)
+	return c.deleteHook(path)
 }
 
 // DeleteOrgHook deletes and existing org level webhook.
 // https://developer.github.com/v3/orgs/hooks/#edit-a-hook
 func (c *client) DeleteOrgHook(org string, id int, req HookRequest) error {
 	c.log("DeleteOrgHook", org, id)
-	return c.deleteHook(org, nil, id, req)
+	path := fmt.Sprintf("/orgs/%s/hooks/%d", org, id)
+	return c.deleteHook(path)
 }
 
 // GetOrg returns current metadata for the org

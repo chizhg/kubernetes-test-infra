@@ -190,8 +190,6 @@ You can do this with the `update-hook` utility:
 bazel run //experiment/update-hook -- \
   --hmac-path=/path/to/hook/secret \
   --github-token-path=/path/to/oauth/secret \
-  --github-endpoint=http://ghproxy \  # Replace this as needed to point to your ghProxy instance.
-  --github-endpoint=https://api.github.com \
   --hook-url http://an.ip.addr.ess/hook \
   --repo my-org/my-repo \
   --repo my-whole-org \

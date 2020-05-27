@@ -23,6 +23,7 @@ prow_push(
             "grandmatriarch",
             "gcsupload",
             "hook",
+            "hmac",
             "horologium",
             "initupload",
             "jenkins-operator",

@@ -1,4 +1,7 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library", "go_test")
+load("//prow:def.bzl", "prow_image")
+
+NAME = "hmac"
 
 go_library(
     name = "go_default_library",
@@ -52,5 +55,14 @@ filegroup(
 go_binary(
     name = "hmac",
     embed = [":go_default_library"],
+    visibility = ["//visibility:public"],
+)
+
+prow_image(
+    name = "image",
+    base = "@alpine-base//image",
+    component = NAME,
+    directory = "/",
+    files = [":hmac"],
     visibility = ["//visibility:public"],
 )

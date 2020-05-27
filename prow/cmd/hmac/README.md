@@ -3,6 +3,34 @@
 `hmac` is a tool to update the HMAC token, GitHub webhooks and HMAC secret
 for the orgs/repos as per the `managed_webhooks` configuration changes in the Prow config file.
 
+## Prerequisites
+
+To run this tool, you need to have a github personal access token that has admin permission to
+the org/repo hooks. Ideally this tool will be run by a postsubmit job to update the webhooks whenever
+there are changes to the Prow core config file, so usually this means you need to grant admin 
+permissions to the bot that is being used.
+
+## How to run this tool
+
+There are two ways to run this tool:
+
+1. Run it on local:
+
+```sh
+bazel run //experiment/update-hook -- \
+  --config-path=/path/to/prow/config \
+  --github-token-path=/path/to/oauth/secret \
+  --hmac-token-secret-name=[hmac secret name in Prow cluster] \
+  --hmac-token-key=[key of the hmac tokens in the secret] \
+  --hook-url http://an.ip.addr.ess/hook \
+  --dryrun=true  # Remove it to actually update hmac tokens and webhooks
+```
+
+1. Run it as a postsubmit job:
+
+TODO(chizhg): add the link of the postsubmit job once we have the image and
+configured for k8s Prow.
+
 ## How it works
 
 Given a new `managed_webhooks` configuration, the tool can reconcile the current

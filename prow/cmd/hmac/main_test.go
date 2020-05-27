@@ -49,7 +49,7 @@ func TestGatherOptions(t *testing.T) {
 			},
 		},
 		{
-			name: "expicitly set --dry-run=false",
+			name: "explicitly set --dry-run=false",
 			args: map[string]string{
 				"--dry-run": "false",
 			},
@@ -72,21 +72,25 @@ func TestGatherOptions(t *testing.T) {
 			ghoptions.AddFlags(&flag.FlagSet{})
 			ghoptions.Validate(false)
 			expected := &options{
-				configPath:          "yo",
-				dryRun:              true,
-				github:              ghoptions,
-				kubernetes:          flagutil.KubernetesOptions{DeckURI: "http://whatever"},
-				namespace:           "default",
-				hmacTokenSecretName: "hmac-token",
-				hmacTokenKey:        "hmac",
+				configPath:               "yo",
+				dryRun:                   true,
+				github:                   ghoptions,
+				kubernetes:               flagutil.KubernetesOptions{DeckURI: "http://whatever-deck-url"},
+				hookUrl:                  "http://whatever-hook-url",
+				hmacTokenSecretNamespace: "default",
+				hmacTokenSecretName:      "hmac-token",
+				hmacTokenKey:             "hmac",
 			}
 			if tc.expected != nil {
 				tc.expected(expected)
 			}
 
 			argMap := map[string]string{
-				"--config-path": "yo",
-				"--deck-url":    "http://whatever",
+				"--config-path":            "yo",
+				"--deck-url":               "http://whatever-deck-url",
+				"--hook-url":               "http://whatever-hook-url",
+				"--hmac-token-secret-name": "hmac-token",
+				"--hmac-token-key":         "hmac",
 			}
 			for k, v := range tc.args {
 				argMap[k] = v
@@ -101,7 +105,7 @@ func TestGatherOptions(t *testing.T) {
 			}
 			fs := flag.NewFlagSet("fake-flags", flag.PanicOnError)
 			actual := gatherOptions(fs, args...)
-			switch err := actual.Validate(); {
+			switch err := actual.validate(); {
 			case err != nil:
 				if !tc.err {
 					t.Errorf("unexpected error: %v", err)
@@ -203,10 +207,10 @@ func TestPruneOldTokens(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			c := &client{currentHmacMap: tc.current}
+			c := &client{currentHMACMap: tc.current}
 			c.pruneOldTokens(tc.repo)
-			if !reflect.DeepEqual(tc.expected, c.currentHmacMap) {
-				t.Errorf("%#v != expected %#v", c.currentHmacMap, tc.expected)
+			if !reflect.DeepEqual(tc.expected, c.currentHMACMap) {
+				t.Errorf("%#v != expected %#v", c.currentHMACMap, tc.expected)
 			}
 		})
 	}

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package updater
+package ghhook
 
 import (
 	"errors"
@@ -102,7 +102,7 @@ func TestGetOptions(t *testing.T) {
 			}
 
 			expected := Options{
-				HmacPath: "/fake/hmac-file",
+				HMACPath: "/fake/hmac-file",
 				HookURL:  "https://not-a-url",
 				Events:   flagutil.NewStrings(github.AllHookEvents...),
 			}
